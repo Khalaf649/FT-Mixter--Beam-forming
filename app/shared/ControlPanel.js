@@ -235,6 +235,8 @@ ${
       if (outputBtn) {
         this.selectedOutput = parseInt(outputBtn.dataset.output);
         this.render();
+        this.FTmixer.setActivePort(this.selectedOutput - 1);
+
         return;
       }
 

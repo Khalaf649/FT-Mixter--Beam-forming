@@ -12,6 +12,7 @@ export class FTMixer {
     this.workerManager = new WorkerManager();
     this.mixer = new Mixer(this.workerManager, this);
     this.controlPanel = null;
+    this.selectedOutput = 0; // Default to first output
 
     this.createLayout();
     this.createViewports();
@@ -104,11 +105,12 @@ export class FTMixer {
       const vp = new Viewport(outputColumn, i, `Output ${i + 1}`, false);
       this.outputs.push(vp);
     }
+    this.updateActivePort();
   }
 
   createControlPanel() {
     const sidebar = document.getElementById("ft-mixer-sidebar");
-    this.controlPanel = new ControlPanel(sidebar);
+    this.controlPanel = new ControlPanel(sidebar, this);
   }
   handleImageLoad(id, file) {
     const reader = new FileReader();
@@ -137,7 +139,13 @@ export class FTMixer {
     };
     reader.readAsDataURL(file);
   }
+  setActivePort(index) {
+    this.selectedOutput = index;
+    this.updateActivePort();
+  }
+
+  updateActivePort() {
+    this.outputs[this.selectedOutput].setSelected(true);
+    this.outputs[1 - this.selectedOutput].setSelected(false);
+  }
 }
-// setActiveOutput(index) {
-//     this.outputs
-//   }
