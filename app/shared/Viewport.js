@@ -321,3 +321,4 @@ export class Viewport {
     this._onImageLoad = callback;
   }
 }
+// i want to add a method to set it as selected or not
