@@ -8,6 +8,7 @@ import {
   computeFFT,
   loadImage,
   imageToCanvas,
+  unifiedMixer,
 } from "../utils/imageProcessing.js";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
@@ -112,7 +113,18 @@ function FTMixer() {
           unifiedSize.height
         );
         const { grayscale, width, height } = canvasToGrayscale(resizedCanvas);
+        console.log(
+          `the dimensions of the spatial domain of the image ${i + 1} :`,
+          width,
+          height
+        );
         const fftResult = computeFFT(grayscale, width, height);
+        console.log(
+          "the dimensions of the frequency domain:",
+          fftResult.paddedWidth,
+          fftResult.paddedHeight
+        );
+
         newImages[i] = {
           grayscale,
           width,
@@ -168,8 +180,46 @@ function FTMixer() {
   }, []);
 
   const handleMix = useCallback(() => {
-    // Implement mixing logic here
-  }, []);
+    if (!images.length) return;
+
+    const MixedImages = images.map((img) =>
+      componentType === "Mag/Phase" && img.grayscale
+        ? {
+            mag: img.ftMagnitude,
+            phase: img.ftPhase,
+            paddedWidth: img.paddedWidth,
+            paddedHeight: img.paddedHeight,
+          }
+        : {
+            real: img.ftReal,
+            imag: img.ftImaginary,
+            paddedWidth: img.paddedWidth,
+            paddedHeight: img.paddedHeight,
+          }
+    );
+
+    const { grayscale, fftReal, fftImaginary, fftMag, fftPhase } = unifiedMixer(
+      MixedImages,
+      weights
+    );
+
+    const newOutputs = [...outputs];
+    if (!newOutputs[selectedOutput - 1]) return;
+
+    newOutputs[selectedOutput - 1] = {
+      ...newOutputs[selectedOutput - 1],
+    grayscale: grayscale,
+      ftReal: fftReal,
+      ftImaginary: fftImaginary,
+      ftMagnitude: fftMag,
+      ftPhase: fftPhase,
+      width: MixedImages[0].paddedWidth,
+      height: MixedImages[0].paddedHeight,
+    };
+
+    setOutputs(newOutputs);
+  }, [images, componentType, weights, outputs, selectedOutput]);
+
   const handleCancel = useCallback(() => {
     // Implement cancel logic here
   }, []);
@@ -206,7 +256,6 @@ function FTMixer() {
         outputs={outputs}
         selectedOutput={selectedOutput}
         setSelectedOutput={setSelectedOutput}
-        unifiedSize={unifiedSize}
       />
     </div>
   );

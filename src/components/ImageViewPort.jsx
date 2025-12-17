@@ -90,7 +90,11 @@ function ImageViewPort({
       ftBrightness,
       ftContrast
     );
-    const imageData = grayscaleToImageData(adjusted, paddedWidth, paddedHeight);
+    const imageData = grayscaleToImageData(
+      adjusted,
+      isOutput ? width : paddedWidth,
+      isOutput ? height : paddedHeight
+    );
     ctx.putImageData(imageData, 0, 0);
 
     if (showRegion && regionPercentage > 0) {

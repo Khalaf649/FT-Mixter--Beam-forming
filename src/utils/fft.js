@@ -145,3 +145,114 @@ export const fft2d = (grayScale, width, height) => {
     imag: shiftedImag,
   };
 };
+
+/**
+ * Performs Inverse 2D FFT to reconstruct the grayscale image.
+ *
+ * @param {Float32Array} inputReal - The shifted Real component (Frequency Domain).
+ * @param {Float32Array} inputImag - The shifted Imaginary component.
+ * @param {number} width - Image width (Must be power of 2).
+ * @param {number} height - Image height (Must be power of 2).
+ * @returns {Float32Array} - The reconstructed Grayscale image pixels (0-255).
+ */
+export const Ifft2d = (inputReal, inputImag, width, height) => {
+  const size = width * height;
+
+  // Buffers to hold the Un-shifted data
+  const real = new Float32Array(size);
+  const imag = new Float32Array(size);
+
+  // =========================================================
+  // STEP 1: Inverse FFT Shift (Un-shift)
+  // We must move the DC component (center) back to (0,0)
+  // before running the standard IFFT algorithm.
+  // =========================================================
+  const halfW = width / 2;
+  const halfH = height / 2;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      // Current position in the Shifted input
+      const currentIdx = y * width + x;
+
+      // Target position in the Un-shifted buffers
+      // (Swap Quadrant 1 <-> 4, Quadrant 2 <-> 3)
+      const newY = (y + halfH) % height;
+      const newX = (x + halfW) % width;
+      const targetIdx = newY * width + newX;
+
+      real[targetIdx] = inputReal[currentIdx];
+      imag[targetIdx] = inputImag[currentIdx];
+    }
+  }
+
+  // =========================================================
+  // STEP 2: Inverse FFT on Columns (Vertical)
+  // =========================================================
+  const fftCol = new FFT(height);
+  const colIn = fftCol.createComplexArray();
+  const colOut = fftCol.createComplexArray();
+
+  for (let x = 0; x < width; x++) {
+    // 1. Fill input buffer for this column
+    for (let y = 0; y < height; y++) {
+      const idx = y * width + x;
+      colIn[2 * y] = real[idx];
+      colIn[2 * y + 1] = imag[idx];
+    }
+
+    // 2. Perform Inverse Transform
+    fftCol.inverseTransform(colOut, colIn);
+
+    // 3. Write back to main arrays
+    for (let y = 0; y < height; y++) {
+      const idx = y * width + x;
+      real[idx] = colOut[2 * y];
+      imag[idx] = colOut[2 * y + 1];
+    }
+  }
+
+  // =========================================================
+  // STEP 3: Inverse FFT on Rows (Horizontal)
+  // =========================================================
+  const fftRow = new FFT(width);
+  const rowIn = fftRow.createComplexArray();
+  const rowOut = fftRow.createComplexArray();
+
+  for (let y = 0; y < height; y++) {
+    const offset = y * width;
+
+    // 1. Fill input buffer for this row
+    for (let x = 0; x < width; x++) {
+      rowIn[2 * x] = real[offset + x];
+      rowIn[2 * x + 1] = imag[offset + x];
+    }
+
+    // 2. Perform Inverse Transform
+    fftRow.inverseTransform(rowOut, rowIn);
+
+    // 3. Write back to main arrays
+    for (let x = 0; x < width; x++) {
+      real[offset + x] = rowOut[2 * x];
+      imag[offset + x] = rowOut[2 * x + 1];
+    }
+  }
+
+  // =========================================================
+  // STEP 4: Normalize and Extract Real Part
+  // The 'fft.js' library does NOT divide by N automatically.
+  // We must divide by (width * height) to restore original amplitude.
+  // =========================================================
+  const outputGrayScale = new Float32Array(size);
+
+  for (let i = 0; i < size; i++) {
+    // Normalize
+    const val = real[i] / size;
+
+    // Optional: Clamp values to valid 0-255 image range
+    // (Filtering frequencies often causes ringing/overshoot)
+    outputGrayScale[i] = Math.max(0, Math.min(255, val));
+  }
+
+  return outputGrayScale;
+};

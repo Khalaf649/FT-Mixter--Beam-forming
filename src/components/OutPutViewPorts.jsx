@@ -22,7 +22,6 @@ function OutputViewPorts({
             height={outputs[id - 1].height}
             isSelected={selectedOutput === id}
             onSelect={setSelectedOutput}
-            displaySize={unifiedSize.width > 0 ? unifiedSize : undefined}
             isOutput={true}
           />
         );
