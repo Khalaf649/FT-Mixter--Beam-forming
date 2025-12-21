@@ -23,6 +23,8 @@ function OutputViewPorts({
             isSelected={selectedOutput === id}
             onSelect={setSelectedOutput}
             isOutput={true}
+            paddedWidth={outputs[id - 1].paddedWidth}
+            paddedHeight={outputs[id - 1].paddedHeight}
           />
         );
       })}

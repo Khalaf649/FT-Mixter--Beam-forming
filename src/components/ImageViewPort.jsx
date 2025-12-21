@@ -21,13 +21,12 @@ function ImageViewPort({
   regionPercentage = 50,
   regionType = "inner",
   showRegion = false,
-  displaySize,
   isOutput = false,
   isSelected = false,
   onSelect,
 }) {
-  const displayWidth = displaySize?.width || width;
-  const displayHeight = displaySize?.height || height;
+  const displayWidth = width;
+  const displayHeight = height;
   const imageCanvasRef = useRef(null);
   const ftCanvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -40,21 +39,23 @@ function ImageViewPort({
   const [isDragging, setIsDragging] = useState(false);
   const [isFtDragging, setIsFtDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-
-  // For output mode, use outputImage; for input mode, use grayscale
+  if (isOutput)
+    console.log(
+      "PaddedWidth: " + paddedWidth + " PaddedHeight: " + paddedHeight
+    );
   const imageData = grayscale;
   useEffect(() => {
     if (!imageCanvasRef.current || !imageData || width === 0 || height === 0)
       return;
     const canvas = imageCanvasRef.current;
     const ctx = canvas.getContext("2d");
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = displayWidth;
+    canvas.height = displayHeight;
 
     // Normalize Float64Array for display
     const normalized = normalizeForDisplay(grayscale, false);
     const adjusted = applyBrightnessContrast(normalized, brightness, contrast);
-    const imgData = grayscaleToImageData(adjusted, width, height);
+    const imgData = grayscaleToImageData(adjusted, displayWidth, displayHeight);
     ctx.putImageData(imgData, 0, 0);
   }, [grayscale, isOutput, width, height, brightness, contrast]);
   useEffect(() => {
@@ -90,11 +91,8 @@ function ImageViewPort({
       ftBrightness,
       ftContrast
     );
-    const imageData = grayscaleToImageData(
-      adjusted,
-      isOutput ? width : paddedWidth,
-      isOutput ? height : paddedHeight
-    );
+
+    const imageData = grayscaleToImageData(adjusted, paddedWidth, paddedHeight);
     ctx.putImageData(imageData, 0, 0);
 
     if (showRegion && regionPercentage > 0) {

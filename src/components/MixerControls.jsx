@@ -1,6 +1,7 @@
 import Button from "./UI/Button";
 import SelectBox from "./UI/SelectBox";
 import Slider from "./UI/Slider";
+import Progress from "./UI/Progress";
 import { Play, Square } from "lucide-react";
 function MixerControls({
   weights,
@@ -166,7 +167,7 @@ function MixerControls({
         <div className="mix-action-section">
           {isProcessing ? (
             <>
-              {/* <Progress value={progress} className="progress-sm" /> */}
+              <Progress isProcessing={isProcessing} className="progress-sm" />
               <Button
                 variant="destructive"
                 className="w-full"

@@ -163,104 +163,81 @@ export function canvasToGrayscale(canvas) {
 }
 
 /**
- * Unified FFT Mixer.
- * Handles both Component Mixing and Region Mixing.
+ * Mixes multiple images in the frequency domain.
  *
- * @param {Array<Object>} images - Array of inputs.
- *        Can be [{mag, phase}, ...] OR [{real, imag}, ...].
- * @param {Array<Object>} weights - Array of mix weights.
- *        Structure: [{ comp1Gain: number, comp2Gain: number }, ...].
- *        comp1Gain applies to Mag (or Real).
- *        comp2Gain applies to Phase (or Imag).
- * @param {number} width - Image width (power of 2).
- * @param {number} height - Image height (power of 2).
- * @param {Object} region - The mask definition.
- *        Structure: { x, y, w, h, mode }.
- *        mode: 'inner' (pass frequencies inside rect, block outside)
- *              'outer' (pass frequencies outside rect, block inside)
- *              'all'   (special case: process everything, ignore rect)
- * @returns {Float32Array} - The reconstructed Grayscale image.
+ * @param {Array} images - Array of image objects containing FT data.
+ * @param {Array} weights - Array of weight objects {component1Gain, component2Gain}.
+ * @param {string} mode - "Mag/Phase" or "Real/Imag".
+ * @param {boolean} isInner - True for Low Pass (inside box), False for High Pass (outside box).
  */
-export const unifiedMixer = (images, weights, region = null) => {
-  const width = images[0].paddedWidth;
-  const height = images[0].paddedHeight;
-  // We explicitly pass width/height now to avoid relying on images[0] being valid
-  const size = width * height;
+export function unifiedMixer(
+  images,
+  weights,
+  mode,
+  isInner,
+  startX,
+  startY,
+  endX,
+  endY
+) {
+  const pWidth = images[0].paddedWidth;
+  const pHeight = images[0].paddedHeight;
+  const size = pWidth * pHeight;
 
   const mixedReal = new Float32Array(size);
   const mixedImag = new Float32Array(size);
 
-  // 1. Detect Input Type (Check the first valid image found)
-  // We assume all provided images follow the same structure
-  const validImg = images.find((img) => img.paddedWidth > 0);
-  if (!validImg) return { grayscale: new Float32Array(size) }; // Return empty if no inputs
+  for (let y = 0; y < pHeight; y++) {
+    for (let x = 0; x < pWidth; x++) {
+      const idx = y * pWidth + x;
 
-  const isPolar = validImg.mag !== undefined && validImg.phase !== undefined;
+      // Determine if pixel is inside the user-defined square
+      const isInside = x >= startX && x <= endX && y >= startY && y <= endY;
 
-  // Default region (Component Mixing Case)
-  const safeRegion = region || {
-    x: 0,
-    y: 0,
-    w: width,
-    h: height,
-    mode: "inner",
-  };
+      // Filter Logic:
+      // If isInner is true, we ONLY mix pixels INSIDE (others become 0).
+      // If isInner is false, we ONLY mix pixels OUTSIDE (others become 0).
+      const shouldProcess = isInner ? isInside : !isInside;
 
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = y * width + x;
+      if (shouldProcess) {
+        let comp1Sum = 0;
+        let comp2Sum = 0;
 
-      // 2. Region Logic
-      const inRect =
-        x >= safeRegion.x &&
-        x < safeRegion.x + safeRegion.w &&
-        y >= safeRegion.y &&
-        y < safeRegion.y + safeRegion.h;
+        // Sum contributions from all loaded images
+        for (let i = 0; i < images.length; i++) {
+          const img = images[i];
+          const w = weights[i];
 
-      let isActive = false;
-      if (safeRegion.mode === "all") isActive = true;
-      else if (safeRegion.mode === "inner") isActive = inRect;
-      else if (safeRegion.mode === "outer") isActive = !inRect;
+          if (mode === "Mag/Phase") {
+            comp1Sum += img.ftMagnitude[idx] * w.component1Gain;
+            comp2Sum += img.ftPhase[idx] * w.component2Gain;
+          } else {
+            comp1Sum += img.ftReal[idx] * w.component1Gain;
+            comp2Sum += img.ftImaginary[idx] * w.component2Gain;
+          }
+        }
 
-      if (!isActive) continue;
-
-      // 3. Mixing Logic
-      let comp1Sum = 0;
-      let comp2Sum = 0;
-
-      for (let j = 0; j < images.length; j++) {
-        const img = images[j];
-        const w = weights[j];
-
-        // Skip empty images
-        if (!img || img.paddedWidth === 0) continue;
-
-        const val1 = isPolar ? img.mag[i] : img.real[i];
-        const val2 = isPolar ? img.phase[i] : img.imag[i];
-
-        // Access properties using the keys defined in your React State
-        comp1Sum += val1 * w.component1Gain;
-        comp2Sum += val2 * w.component2Gain;
-      }
-
-      // 4. Reconstruct Complex Number
-      if (isPolar) {
-        mixedReal[i] = comp1Sum * Math.cos(comp2Sum);
-        mixedImag[i] = comp1Sum * Math.sin(comp2Sum);
+        // Convert sums back to Real/Imaginary components
+        if (mode === "Mag/Phase") {
+          // comp1Sum is combined Magnitude, comp2Sum is combined Phase
+          mixedReal[idx] = comp1Sum * Math.cos(comp2Sum);
+          mixedImag[idx] = comp1Sum * Math.sin(comp2Sum);
+        } else {
+          // comp1Sum is combined Real, comp2Sum is combined Imaginary
+          mixedReal[idx] = comp1Sum;
+          mixedImag[idx] = comp2Sum;
+        }
       } else {
-        mixedReal[i] = comp1Sum;
-        mixedImag[i] = comp2Sum;
+        // Pixel is outside the active region: Set to 0 (Filtering effect)
+        mixedReal[idx] = 0;
+        mixedImag[idx] = 0;
       }
     }
   }
+  const ftReal = mixedReal;
+  const ftImaginary = mixedImag;
+  const ftMagnitude = computeMagnitude(ftReal, ftImaginary);
+  const ftPhase = computePhase(ftReal, ftImaginary);
 
-  // 5. Perform Inverse FFT
-  // Ensure you are using the IFFT function we defined previously
-  return {
-    grayscale: Ifft2d(mixedReal, mixedImag, width, height),
-    fftReal: mixedReal,
-    fftImaginary: mixedImag,
-    fftMag: computeMagnitude(mixedReal, mixedImag),
-    fftPhase: computePhase(mixedReal, mixedImag),
-  };
-};
+  return { ftReal, ftImaginary, ftMagnitude, ftPhase };
+}

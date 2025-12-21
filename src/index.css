@@ -1325,7 +1325,53 @@ header {
 }
 
 /* Progress Bar */
-.progress-sm {
+.progress-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 0.5rem;
+  background-color: var(--secondary);
+  border-radius: 9999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--signal-cyan), var(--signal-magenta));
+  transition: width 150ms ease;
+  border-radius: 9999px;
+}
+
+.progress-fill.indeterminate {
+  width: 40%;
+  position: absolute;
+  animation: indeterminate-slide 1.5s cubic-bezier(0.65, 0.05, 0.36, 1) infinite;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--signal-cyan) 25%,
+    var(--signal-magenta) 75%,
+    transparent 100%
+  );
+}
+
+@keyframes indeterminate-slide {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.progress-sm .progress-bar {
   height: 0.5rem;
 }
 

@@ -28,7 +28,6 @@ function InputViewPorts({
           showRegion={
             mixerMode === "region" && images[id - 1].grayscale !== null
           }
-          displaySize={unifiedSize.width > 0 ? unifiedSize : undefined}
         />
       ))}
     </div>
